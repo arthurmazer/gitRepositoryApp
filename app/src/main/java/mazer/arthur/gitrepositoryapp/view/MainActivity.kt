@@ -11,6 +11,7 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.DefaultItemAnimator
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import kotlinx.android.synthetic.main.activity_main.*
 import mazer.arthur.gitrepositoryapp.R
 import mazer.arthur.gitrepositoryapp.data.ApiHelper
@@ -20,7 +21,7 @@ import mazer.arthur.gitrepositoryapp.utils.ViewModelFactory
 import mazer.arthur.gitrepositoryapp.utils.listeners.OnRepoClicked
 import mazer.arthur.gitrepositoryapp.view.adapters.RepoAdapter
 
-class MainActivity : AppCompatActivity(), OnRepoClicked {
+class MainActivity : AppCompatActivity(), OnRepoClicked, SwipeRefreshLayout.OnRefreshListener {
 
     private lateinit var viewModel: MainViewModel
 
@@ -37,27 +38,37 @@ class MainActivity : AppCompatActivity(), OnRepoClicked {
 
     private fun setupView() {
         setupRepositoriesRecyclerView()
+        swipeToRefresh.setOnRefreshListener(this)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        getRepositoriesList()
+    }
+
+    override fun onRefresh() {
+        getRepositoriesList()
+    }
+
+    fun getRepositoriesList(){
+        viewModel.getRepositories()
     }
 
     private fun registerObservers(){
-        viewModel.getRepositories().observe(this, Observer {
-            it.let{ response ->
-                when (response.status){
-                    Status.SUCCESS -> {
-                        showLoading(false)
-                        response.data.let { repoList ->
-                            repoAdapter.repoList = repoList ?: return@Observer
-                        }
-                    }
-                    Status.LOADING -> {
-                        showLoading(true)
-                    }
-                    Status.ERROR -> {
-                        showErrorMessage(R.string.error_fetching_repo)
-                    }
+        viewModel.repositoriesLiveData.observe(this, Observer {
+
+            swipeToRefresh.isRefreshing = false
+            when (it){
+                is MainViewModel.ResponseEvents.Success -> {
+                    showLoading(false)
+                    repoAdapter.repoList = it.repoList
                 }
-
-
+                is MainViewModel.ResponseEvents.Loading -> {
+                    showLoading(true)
+                }
+                is MainViewModel.ResponseEvents.Error -> {
+                    showErrorMessage(R.string.error_fetching_repo)
+                }
             }
         })
     }
@@ -106,5 +117,4 @@ class MainActivity : AppCompatActivity(), OnRepoClicked {
             showErrorMessage(R.string.error_opening_repo)
         }
     }
-
 }
